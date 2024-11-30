@@ -8,47 +8,51 @@ const webserver = express()
     )
     .listen(3000, () => console.log(`HTTP server is listening on port 3000`));
 
-// WebSocket server on port 8080
 const sockserver = new WebSocketServer({ port: 413 });
 console.log(`WebSocket server is listening on ws://localhost:413`);
 
-let clientCount = 0; // Initialize a counter for connected clients
+let clients = [];
+let operator = null; // Variable to hold the operator connection
 
 sockserver.on('connection', (ws, req) => {
-    clientCount++; // Increment the count when a new client connects
-    const ip = req.socket.remoteAddress || req.headers['x-forwarded-for'];
-    console.log(`New client connected! IP: ${ip} - Total connected clients: ${clientCount}`);
+    ws.on('message', data => {
+        const message = JSON.parse(data);
 
-    ws.send(`Client connected. Your IP address is: ${ip}.`);
+        if (message.type === 'register') {
+            if (message.role === 'operator') {
+                operator = ws;
+                console.log('Operator connected');
+                ws.send(JSON.stringify({ message: 'You are now registered as the operator.' }));
 
-    // Broadcast current client count
-    sockserver.clients.forEach(client => {
-        if (client.readyState === client.OPEN) {
-            client.send(`Current connected clients: ${clientCount}`);
+            } else if (message.role === 'client') {
+                clients.push(ws);
+                console.log('Client connected');
+
+                ws.send(JSON.stringify({ message: 'You are now registered as a client.' }));
+
+                // Notify operator about the new client
+                if (operator) {
+                    operator.send(JSON.stringify({ message: 'A new client has connected.' }));
+                }
+            }
+        } else if (message.type === 'clientMessage' && operator) {
+            // If a client sends a message, forward it to the operator
+            operator.send(JSON.stringify({ clientMessage: message.text }));
+        } else if (message.type === 'operatorMessage' && operator) {
+            // If the operator sends a message, forward it to all clients
+            clients.forEach(client => {
+                if (client.readyState === client.OPEN) {
+                    client.send(JSON.stringify({ operatorMessage: message.text }));
+                }
+            });
         }
     });
 
     ws.on('close', () => {
-        clientCount--; // Decrement the count when a client disconnects
-        console.log(`Client has disconnected! IP: ${ip} - Total connected clients: ${clientCount}`);
+        console.log('A client or operator has disconnected');
 
-        // Broadcast updated client count
-        sockserver.clients.forEach(client => {
-            if (client.readyState === client.OPEN) {
-                client.send(`Current connected clients: ${clientCount}`);
-            }
-        });
-    });
-
-    ws.on('message', data => {
-        console.log(`Message from client: ${data}`);
-
-        // Broadcast the message to all connected clients
-        sockserver.clients.forEach(client => {
-            if (client.readyState === client.OPEN) {
-                client.send(`Hello dear client, this is your message: ${data}`);
-            }
-        });
+        // Remove client from the clients array
+        clients = clients.filter(client => client !== ws);
     });
 
     ws.onerror = function () {

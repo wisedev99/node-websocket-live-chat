@@ -22,38 +22,64 @@
 
     <body>
         <h1>WebSocket Client</h1>
+
+        <input type="text" id="roleInput" placeholder="Enter role (client/operator)" />
+        <button id="registerButton">Register</button>
+
         <div id="messages"></div>
 
         <input type="text" id="messageInput" placeholder="Type a message..." />
         <button id="sendButton">Send</button>
 
         <script>
-            const socket = new WebSocket('ws://localhost:413'); // Connect to the WebSocket server
+            let socket;
+            const messagesDiv = document.getElementById('messages');
 
-            socket.onopen = () => {
-                console.log('WebSocket connection established');
-                // You can send messages here if needed
-            };
+            document.getElementById('registerButton').onclick = () => {
+                const role = document.getElementById('roleInput').value;
+                socket = new WebSocket('ws://localhost:413'); // Connect to the WebSocket server
 
-            socket.onmessage = (event) => {
-                const messagesDiv = document.getElementById('messages');
-                messagesDiv.innerHTML += '<p>' + event.data + '</p>';
-            };
+                socket.onopen = () => {
+                    console.log('WebSocket connection established');
+                    socket.send(JSON.stringify({ type: 'register', role: role.toLowerCase() }));
+                    document.getElementById('roleInput').disabled = true;
+                    document.getElementById('registerButton').disabled = true;
+                };
 
-            socket.onerror = (error) => {
-                console.error('WebSocket error: ', error);
-            };
+                socket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.message) {
+                        messagesDiv.innerHTML += '<p>' + data.message + '</p>';
+                    }
+                    if (data.clientMessage) {
+                        messagesDiv.innerHTML += '<p><strong>Client:</strong> ' + data.clientMessage + '</p>';
+                    }
+                    if (data.operatorMessage) {
+                        messagesDiv.innerHTML += '<p><strong>Operator:</strong> ' + data.operatorMessage + '</p>';
+                    }
+                };
 
-            socket.onclose = () => {
-                console.log('WebSocket connection closed');
+                socket.onerror = (error) => {
+                    console.error('WebSocket error: ', error);
+                };
+
+                socket.onclose = () => {
+                    console.log('WebSocket connection closed');
+                };
             };
 
             // Send a message when the button is clicked
             document.getElementById('sendButton').onclick = () => {
                 const input = document.getElementById('messageInput');
                 const message = input.value;
-                socket.send(message);
-                input.value = ''; // Clear the input field
+                if (message) {
+                    if (document.getElementById('roleInput').value.toLowerCase() === 'client') {
+                        socket.send(JSON.stringify({ type: 'clientMessage', text: message }));
+                    } else if (document.getElementById('roleInput').value.toLowerCase() === 'operator') {
+                        socket.send(JSON.stringify({ type: 'operatorMessage', text: message }));
+                    }
+                    input.value = ''; // Clear the input field
+                }
             };
         </script>
     </body>
