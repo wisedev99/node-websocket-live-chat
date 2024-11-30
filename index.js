@@ -1,61 +1,75 @@
-const express = require('express');
-const { WebSocketServer } = require('ws');
+// server.js
+const WebSocket = require('ws');
+const db = require('./database');
 
-// Create an express server
-const webserver = express()
-    .use((req, res) =>
-        res.sendFile('websocket-client.html', { root: __dirname })
-    )
-    .listen(3000, () => console.log(`HTTP server is listening on port 3000`));
+const wss = new WebSocket.Server({ port: 413 });
 
-const sockserver = new WebSocketServer({ port: 413 });
-console.log(`WebSocket server is listening on ws://localhost:413`);
+console.log('WebSocket server running on ws://localhost:413');
 
-let clients = [];
-let operator = null; // Variable to hold the operator connection
+try {
+    wss.on('connection', (ws) => {
+        try {
+            ws.on('message', (message) => {
+                const data = JSON.parse(message);
 
-sockserver.on('connection', (ws, req) => {
-    ws.on('message', data => {
-        const message = JSON.parse(data);
+                if (data.type === 'clientMessage' || data.type === 'operatorMessage') {
+                    const role = data.type === 'clientMessage' ? 'client' : 'operator';
+                    const msg = data.text;
 
-        if (message.type === 'register') {
-            if (message.role === 'operator') {
-                operator = ws;
-                console.log('Operator connected');
-                ws.send(JSON.stringify({ message: 'You are now registered as the operator.' }));
+                    // Store the message in the database
+                    db.run(`INSERT INTO messages (role, message) VALUES (?, ?)`, [role, msg], function (err) {
+                        if (err) {
+                            console.error(err.message);
+                        }
+                    });
 
-            } else if (message.role === 'client') {
-                clients.push(ws);
-                console.log('Client connected');
-
-                ws.send(JSON.stringify({ message: 'You are now registered as a client.' }));
-
-                // Notify operator about the new client
-                if (operator) {
-                    operator.send(JSON.stringify({ message: 'A new client has connected.' }));
+                    // Broadcast the message back to all clients
+                    wss.clients.forEach((client) => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                [`${role}Message`]: msg,
+                            }));
+                        }
+                    });
                 }
-            }
-        } else if (message.type === 'clientMessage' && operator) {
-            // If a client sends a message, forward it to the operator
-            operator.send(JSON.stringify({ clientMessage: message.text }));
-        } else if (message.type === 'operatorMessage' && operator) {
-            // If the operator sends a message, forward it to all clients
-            clients.forEach(client => {
-                if (client.readyState === client.OPEN) {
-                    client.send(JSON.stringify({ operatorMessage: message.text }));
+
+                if (data.type === 'register') {
+                    wss.clients.forEach((client) => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                message: `${data.role} has joined the chat.`,
+                            }));
+                        }
+                    });
                 }
+            });
+        } catch (error) {
+            console.error('An unexpected error occurred:1111 -- - -', error);
+
+        }
+
+        ws.on('close', () => {
+            console.log('Client disconnected');
+        });
+    });
+} catch (error) {
+    console.error('An unexpected error occurred:222 --- ', error);
+}
+
+// Fetch all messages on request
+wss.on('connection', (ws) => {
+    ws.on('message', (message) => {
+        const data = JSON.parse(message);
+
+        if (data.type === 'fetchMessages') {
+            db.all(`SELECT * FROM messages ORDER BY timestamp ASC`, [], (err, rows) => {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
+
+                ws.send(JSON.stringify({ type: 'allMessages', messages: rows }));
             });
         }
     });
-
-    ws.on('close', () => {
-        console.log('A client or operator has disconnected');
-
-        // Remove client from the clients array
-        clients = clients.filter(client => client !== ws);
-    });
-
-    ws.onerror = function () {
-        console.log('WebSocket error');
-    };
 });

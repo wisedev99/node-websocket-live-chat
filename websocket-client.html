@@ -22,14 +22,11 @@
 
     <body>
         <h1>WebSocket Client</h1>
-
         <input type="text" id="roleInput" placeholder="Enter role (client/operator)" />
-        <button id="registerButton">Register</button>
-
+        <button id="registerButton" type="button">Register</button>
         <div id="messages"></div>
-
         <input type="text" id="messageInput" placeholder="Type a message..." />
-        <button id="sendButton">Send</button>
+        <button id="sendButton" type="button">Send</button>
 
         <script>
             let socket;
@@ -37,25 +34,30 @@
 
             document.getElementById('registerButton').onclick = () => {
                 const role = document.getElementById('roleInput').value;
-                socket = new WebSocket('ws://localhost:413'); // Connect to the WebSocket server
+                socket = new WebSocket('ws://localhost:413');
 
                 socket.onopen = () => {
                     console.log('WebSocket connection established');
                     socket.send(JSON.stringify({ type: 'register', role: role.toLowerCase() }));
                     document.getElementById('roleInput').disabled = true;
                     document.getElementById('registerButton').disabled = true;
+                    socket.send(JSON.stringify({ type: 'fetchMessages' }));
                 };
 
                 socket.onmessage = (event) => {
                     const data = JSON.parse(event.data);
                     if (data.message) {
                         messagesDiv.innerHTML += '<p>' + data.message + '</p>';
-                    }
-                    if (data.clientMessage) {
+                    } else if (data.clientMessage) {
                         messagesDiv.innerHTML += '<p><strong>Client:</strong> ' + data.clientMessage + '</p>';
-                    }
-                    if (data.operatorMessage) {
+                    } else if (data.operatorMessage) {
                         messagesDiv.innerHTML += '<p><strong>Operator:</strong> ' + data.operatorMessage + '</p>';
+                    } else if (data.type === 'allMessages') {
+                        data.messages.forEach(msg => {
+                            messagesDiv.innerHTML += `<p><strong>${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)}:</strong> ${msg.message}</p>`;
+                        });
+                    } else if (data.error) {
+                        messagesDiv.innerHTML += `<p style="color:red;">Error: ${data.error}</p>`;
                     }
                 };
 
@@ -68,14 +70,16 @@
                 };
             };
 
-            // Send a message when the button is clicked
-            document.getElementById('sendButton').onclick = () => {
+            document.getElementById('sendButton').onclick = (event) => {
+                event.preventDefault(); // Prevents page from reloading
+
                 const input = document.getElementById('messageInput');
-                const message = input.value;
+                const message = input.value.trim(); // Trim the message input
                 if (message) {
-                    if (document.getElementById('roleInput').value.toLowerCase() === 'client') {
+                    const role = document.getElementById('roleInput').value.toLowerCase();
+                    if (role === 'client') {
                         socket.send(JSON.stringify({ type: 'clientMessage', text: message }));
-                    } else if (document.getElementById('roleInput').value.toLowerCase() === 'operator') {
+                    } else if (role === 'operator') {
                         socket.send(JSON.stringify({ type: 'operatorMessage', text: message }));
                     }
                     input.value = ''; // Clear the input field
