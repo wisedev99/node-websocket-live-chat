@@ -35,6 +35,36 @@ Follow these steps to set up your project:
     ```
 4. **Connect to the WebSocket:** Use a WebSocket client (or build a front-end application) to connect to the server at ws://localhost:413.
 
+
+                                            +-----------------------+
+                                            |      WebSocket        |
+                                            |      Server (wss)     |
+                                            +----------+------------+
+                                                        |
+                                                        |
+                                    +-------------------+----------------------+
+                                    |                                      (Connections)
+                                    |
+                                    |
+                            +----+----------+                        +---------+-------+
+                            |  Operator     |                        |     Client      |
+                            | (Web Browser) |                        | (Web Browser)   |
+                            +---------------+                        +-----------------+
+                                    |                                           |
+                                    |                                           |
+                            (Send Messages / Fetch Messages)            (Send Messages / Fetch Messages)
+                                    |                                           |
+                                    +------------------------+-----------------+
+                                                            |
+                                                            |
+                                    +---------------------+---------------------+
+                                    |                                           |
+                                +------+-------+                            +------+-------+
+                                |   Database   |                            |   Message    |
+                                |   (SQLite)   |                            |   Storage    |
+                                +--------------+                            +--------------+
+
+
 # Technologies Used
     Node.js: A JavaScript runtime for building fast and scalable applications.
     WebSocket: A protocol for full-duplex communication channels over a single TCP connection, ideal for real-time web applications.
