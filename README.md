@@ -21,19 +21,15 @@
 
 Follow these steps to set up your project:
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/yourusername/node-websocket-live-chat.git
-   cd node-websocket-live-chat
-2. **Install dependencies**:
+1. **Install dependencies**:
     ```bash
     npm install
 
-3. **Run the server:**:
+2. **Run the server:**:
     ```bash
     node index.js
     ```
-4. **Connect to the WebSocket:** Use a WebSocket client (or build a front-end application) to connect to the server at ws://localhost:413.
+3. **Connect to the WebSocket:** Use a WebSocket client (or build a front-end application) to connect to the server at ws://localhost:413.
 
 
                              +-----------------------+
